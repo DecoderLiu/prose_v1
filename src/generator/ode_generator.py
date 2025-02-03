@@ -80,7 +80,8 @@ class Generator:
         Generate interval for sample parameters
         """
         gamma = self.params.data.param_range_gamma
-        half_range = np.abs(mean) * gamma
+        shift = self.params.data.param_range_shift
+        half_range = np.abs(mean * shift) * gamma
         return [mean - half_range, mean + half_range]
 
     def get_skeleton_tree(self, type, mode=0, rng=None):

@@ -78,16 +78,16 @@ class RandomFunctions:
             + [f"uxx_{i}" for i in range(self.max_output_dimension)]
             + [f"uxxx_{i}" for i in range(self.max_output_dimension)]
             + [f"uxxxx_{i}" for i in range(self.max_output_dimension)]
-            + ["u_0(x,t)"]
+            # + ["u_0(x,t)"]
             + ["x"]
-            + ["t"]
+            # + ["t"]
         )
         self.symbols = (
             list(self.operators)
             + self.constants
             + self.variables
             + ["|", "INT+", "INT-", "FLOAT+", "FLOAT-", "pow", "0"]
-            + ["(", ")", "+", "-", ",", "*", "**", "Derivative"]
+            # + ["(", ")", "+", "-", ",", "*", "**", "Derivative"]
         )
         self.constants.remove("CONSTANT")
 

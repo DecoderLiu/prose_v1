@@ -8,6 +8,11 @@ logger = getLogger()
 
 
 def get_dataset(params, symbol_env, split, skip = 0):
+    if split == "eval":
+        datasets_list = params.data.eval_data if params.data.eval_data is not None else [""]
+    else:
+        datasets_list = params.data.train_data if params.data.train_data is not None else [""]
+    datasets_list = [datasets_list] if isinstance(datasets_list, str) else datasets_list
 
 
     if split == "train":
@@ -22,9 +27,21 @@ def get_dataset(params, symbol_env, split, skip = 0):
             else:
                 types =  params.data.eval_types if split == "eval" else params.data.train_types
                 types = [types] if isinstance(types,str) else types
-            for t in   types:
-                ds = MultiPDE(params,symbol_env,split = split,types=t, skip= skip)
-                datasets[t] = ds
+            # for t in   types:
+                # ds = MultiPDE(params,symbol_env,split = split,types=t, skip= skip)
+                # datasets[t] = ds
+            for t in types:
+                for d in datasets_list:
+
+                    ds = MultiPDE(params, symbol_env, split=split, types=t, datasets=d, skip=skip)
+                    if datasets_list == [""]:
+                        name = t
+                    else:
+                        if d == "":
+                            name = t
+                        else:
+                            name = t + "%" + d
+                    datasets[name] = ds
         else:
             for pair in params.data.eval_data_pairs:
                 ds = MultiPDE(params,symbol_env,split = split, type_data_pair=pair, skip= skip)

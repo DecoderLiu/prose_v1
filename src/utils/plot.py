@@ -6,9 +6,12 @@ from matplotlib import pyplot as plt
 colors = ["blue", "orange", "green", "purple", "olive", "red", "magenta", "black"]
 
 
-def plot_ax(ax, array, title=None, fontsize=15, cmap="bwr"):
-    vmax = np.max(np.abs(array))
-    im = ax.imshow(array, cmap=cmap, vmin=-vmax, vmax=vmax)
+def plot_ax(ax, array, title=None, fontsize=15, cmap="bwr",vmin = None, vmax=None):
+    if vmax is None:
+        vmax = np.max(np.abs(array))
+    if vmin is None:
+        vmin = min(-vmax, 2*vmax)
+    im = ax.imshow(array, cmap=cmap, vmin=vmin, vmax=vmax)
     cbar = plt.colorbar(im, ax=ax, fraction=0.046)
     cbar.ax.tick_params(labelsize=fontsize - 4)
     if title is not None:
@@ -87,7 +90,9 @@ def plot_1d_pde(
     output_step=1,
     output_start=None,
     diff_plot = True,
-    input_plot = True
+    input_plot = True,
+        input_start = 0,
+        output_end = None
 ):
     """
     Plot 1D PDE data including input, target, output, and difference.
@@ -97,19 +102,20 @@ def plot_1d_pde(
     - time: (input_len + output_len)
     """
     if output_start is None:
-        output_start = input_len
+        output_start = input_len + input_start
     if dim < 0:
         dim = output_1.shape[-1]
-
+    if output_end is None or  output_end ==-1 :
+        output_end = data_all.shape[0]
     # Ensure time and coords are numpy arrays
     time = np.array(time)
     coords = np.array(coords)
 
     # Slice data for input and target
-    input = data_all[:input_len:input_step]
-    target = data_all[output_start::output_step]
-    input_time = time[:input_len:input_step]
-    output_time = time[output_start::output_step]
+    input = data_all[input_start:input_len+input_start:input_step]
+    target = data_all[output_start:output_end:output_step]
+    input_time = time[input_start:input_len+input_start:input_step]
+    output_time = time[output_start:output_end:output_step]
 
     if input_plot:
         num_plots = 3
@@ -123,29 +129,42 @@ def plot_1d_pde(
     if len(axs.shape) == 1:
         axs = axs.reshape(dim, num_plots)
 
+    vmin = min(np.min(input), np.min(target), np.min(output_1))
+    vmax = max(np.max(input), np.max(target), np.max(output_1))
+    if output_2 is not None:
+        vmin = min(vmin, np.min(output_2))
+        vmax = max(vmax, np.max(output_2))
     for j in range(dim):
         if input_plot:
             # Create the data list considering if output_2 is provided
             data_list = [input[..., j], target[..., j], output_1[..., j]]
             titles = ['Input', 'Target', 'Output']
+            uniform_color = [0,1,2]
         else:
             # Create the data list considering if output_2 is provided
             data_list = [target[..., j], output_1[..., j]]
             titles = [ 'Target', 'Output']
+            uniform_color = [0,1]
         if diff_plot:
             data_list.extend([ target[..., j] - output_1[..., j]])
             titles.extend(['Diff'])
         if output_2 is not None:
             assert diff_plot
+            uniform_color.append(len(titles))
             titles[2] = 'Output_zero_shot'
             titles[3] = 'Diff_zero_shot'
             data_list.extend([output_2[..., j], target[..., j] - output_2[..., j]])
             titles.extend(['Output_few_shot', 'Diff_few_shot'])
 
+
         for i, data in enumerate(data_list):
             num_x_ticks = 10
             num_y_ticks = 5
-            im = axs[j, i].imshow(data, aspect='auto')
+            if i in uniform_color:
+                vminn,vmaxx = vmin,vmax
+            else:
+                vminn,vmaxx = None,None
+            im = axs[j, i].imshow(data, aspect='auto',vmin=vminn, vmax =vmaxx)
             axs[j, i].set_title(titles[i])
 
             # Calculate tick positions and labels for x and y

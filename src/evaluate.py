@@ -205,12 +205,14 @@ class Evaluator(object):
                         None,
                         filename=f"{type}_plot_worst",
                         folder=plot_folder,
-                        dim=params.data[type].dim,
+                        dim=(params.data[type.split("%")[0]]).dim,
                         input_step=params.input_step,
                         output_step=params.output_step,
-                        output_start=params.input_len if params.output_step == 1 else params.input_len + 1,
+                        output_start = params.output_start if params.output_start!=-1  else params.input_len + params.input_start if params.output_step == 1 else params.input_len + params.input_start+ 1,
                         diff_plot=False,
-                        input_plot=False
+                        input_plot=False,
+                        input_start=params.input_start,
+                        output_end = params.output_end
                     )
 
 
@@ -287,7 +289,7 @@ class Evaluator(object):
                             try:
                                 if np.isfinite(generated_outputs).all():
                                     error = np.sqrt(np.sum((generated_outputs - label_outputs) ** 2)/ (np.sum(label_outputs ** 2) + eps))
-                                    assert error< 100
+                                    assert error < 1
                                     valid_loss.append(error)
                                     if self.params.symbol.refine:
                                         error_refined = np.sqrt(
@@ -386,10 +388,12 @@ class Evaluator(object):
                             plot_title,
                             filename=f"{type}_plot_{index}",
                             folder=save_folder,
-                            dim=params.data[type].dim,
+                            dim=(params.data[type.split("%")[0]]).dim,
                             input_step = params.input_step,
                             output_step = params.output_step,
-                            output_start = params.input_len if params.output_step == 1 else params.input_len + 1
+                            output_start=params.output_start if params.output_start!=-1  else params.input_len + params.input_start if params.output_step == 1 else params.input_len + params.input_start + 1,
+                            input_start=params.input_start,
+                            output_end = params.output_end
                         )
 
                 if params.log_eval_plots > 0 and num_plotted < params.log_eval_plots:
@@ -415,10 +419,12 @@ class Evaluator(object):
                         plot_title,
                         filename=f"{type}_plot_{index}",
                         folder=plot_folder,
-                        dim=params.data[type].dim,
+                        dim=(params.data[type.split("%")[0]]).dim,
                         input_step=params.input_step,
                         output_step=params.output_step,
-                        output_start=params.input_len if params.output_step == 1 else params.input_len + 1
+                        output_start = params.output_start if params.output_start!=-1  else params.input_len + params.input_start if params.output_step == 1 else params.input_len + params.input_start+ 1,
+                        input_start=params.input_start,
+                        output_end = params.output_end
                     )
 
                     if params.use_wandb:
@@ -473,11 +479,11 @@ class Evaluator(object):
                     stats[k] += v / len(self.dataloaders)
                 elif k == "_mse":
                     # rescale mse due to padding dimensions
-                    ratio = self.params.data.max_output_dimension / self.params.data[type].dim
+                    ratio = self.params.data.max_output_dimension / (self.params.data[type.split("%")[0]]).dim
                     res_mean_type[k] = v / results["size"] * ratio
                     stats[k] += v * ratio
                 elif k == "_rmse":
-                    ratio = (self.params.data.max_output_dimension / self.params.data[type].dim) ** 0.5
+                    ratio = (self.params.data.max_output_dimension / (self.params.data[type.split("%")[0]]).dim) ** 0.5
                     res_mean_type[k] = v / results["size"] * ratio
                     stats[k] += v * ratio
                 elif k.startswith("text_loss") or k== "orig_gen_l2" or k=="ref_gen_l2":
@@ -503,7 +509,7 @@ class Evaluator(object):
                     headers = headers + ["orig_gen_l2","text_loss_ref" ,"ref_gen_l2"]
         table = []
         for type, results in results_per_type.items():
-            row = [type, self.params.data[type].dim]
+            row = [type,(self.params.data[type.split("%")[0]]).dim]
             for k in headers[2:]:
                 row.append(results[k])
             table.append(row)
@@ -616,7 +622,7 @@ class Evaluator(object):
         # expr, init_variable, fluxx, viscous = self.init_param(expr)
         # Number of particles
         M = 500
-        T = 10
+        T = p.symbol.refine_steps
 
         obs_noise =  np.linalg.norm(data_input[0].cpu().numpy())/20
 
@@ -734,5 +740,6 @@ class Evaluator(object):
             GivenIC=GivenIC,
             mode="periodic"
         )
-        output_start = self.params.input_len if  self.params.output_step == 1 else  self.params.input_len + 1
-        return  np.array(uu[0,0,output_start::self.params.output_step, :])
+        output_end = p.data.t_num if self.params.output_end == -1 else self.params.output_end
+        output_start =self.params.output_start if self.params.output_start!=-1 else self.params.input_len + self.params.input_start if  self.params.output_step == 1 else  self.params.input_len + self.params.input_start  + 1
+        return  np.array(uu[0,0,output_start:output_end:self.params.output_step, :])

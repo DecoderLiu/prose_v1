@@ -15,6 +15,7 @@ use_skeleton: false
 swapping: false
 
 refine: false
+refine_steps: 10
 
 all_type: false
 # Number of tokens for the mantissa (must be a divisor of float_precision+1)

@@ -16,10 +16,11 @@ generating_mode: 0
 ### data
 
 # Length of the input sequence
+input_start: 0
 input_len: 32
 input_step: 2
 output_start: -1
-
+output_end: -1
 output_step: 2
 # num of training data in total
 train_size: 51200

@@ -45,7 +45,7 @@ class Trainer(object):
                     device_ids=[params.local_rank],
                     output_device=params.local_rank,
                     broadcast_buffers=True,
-                    # find_unused_parameters=True,
+                    find_unused_parameters=True,
                 )
 
         # set optimizer
@@ -423,12 +423,17 @@ class Trainer(object):
                 output_start =  self.params.output_start
             else:
                 output_start =  self.params.output_start + 1
+        if self.params.output_end == -1:
+            output_end = self.params.data.t_num
+        else:
+            output_end = self.params.output_end
+        input_start = self.params.input_start
 
 
-        data_input = data[:, :input_len:input_step]  # (bs, input_len, x_num,  dim)
-        data_label = data[:, output_start::output_step]  # (bs, output_len, x_num,  dim)
-        input_times = t[:, :input_len:input_step]  # (bs, input_len)
-        output_times = t[:, output_start::output_step]  # (bs, output_len)
+        data_input = data[:, input_start:input_start + input_len:input_step]  # (bs, input_len, x_num,  dim)
+        data_label = data[:, output_start:output_end:output_step]  # (bs, output_len, x_num,  dim)
+        input_times = t[:,input_start :input_start + input_len:input_step]  # (bs, input_len)
+        output_times = t[:, output_start:output_end:output_step]  # (bs, output_len)
         spatial_grid = x
 
         data_input, data_label, input_times, output_times, data_mask, symbol, symbol_input, symbol_input_mask, symbol_padding_mask, spatial_grid, symbol_length, symbol_y, symbol_pred_mask= to_cuda(

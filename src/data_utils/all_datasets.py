@@ -17,7 +17,7 @@ logger = getLogger()
 
 
 class MultiPDE(Dataset):
-    def __init__(self, params, symbol_env, split="train", types=None, type_data_pair=None, skip=0):
+    def __init__(self, params, symbol_env, split="train", types=None, datasets = None, type_data_pair=None, skip=0):
         super().__init__()
 
         # general initialization, should be called by all subclasses
@@ -25,14 +25,40 @@ class MultiPDE(Dataset):
         self.train = split == "train"
         self.params = params
         self.reload_size = params.train_size if self.train else params.eval_size
+        if datasets is not None:
+            if datasets == "":
+                self.datasets = [""]
+            elif isinstance(datasets, (list, ListConfig)):
+                self.datasets = ["_" + a if a != "reg" else "" for a in datasets]
+            else:
+                assert isinstance(datasets, str)
+                self.datasets = ["_" + datasets]  if datasets != "reg" else [""]
+        else:
+            if self.train:
+                print(params.data.train_data )
+                if params.data.train_data is None:
+                    self.datasets = [""]
+                elif isinstance(params.data.train_data,(list, ListConfig)) :
+                    self.datasets = ["_" + a for a in params.data.train_data]
+                else:
+                    assert isinstance(params.data.train_data, str)
+                    self.datasets = ["_" +  params.data.train_data]
+            else:
+                # self.datasets = "_" + params.data.eval_data if params.data.eval_data is not None else ""
+                if params.data.eval_data is None:
+                    self.datasets = [""]
+                elif isinstance(params.data.eval_data, (list, ListConfig)):
+                    self.datasets = ["_" + a if a != "reg" else "" for a in params.data.eval_data]
+                else:
+                    assert isinstance(params.data.eval_data, str)
+                    self.datasets = ["_" + params.data.eval_data]  if datasets != "reg" else [""]
+
         if self.train:
-            self.datasets = params.data.train_data if params.data.train_data is not None else ""
             if params.train_size_get > 0:
                 self.get_size = params.train_size_get
             else:
                 self.get_size = params.train_size
         else:
-            self.datasets = "_" + params.data.eval_data if params.data.eval_data is not None else ""
             if params.eval_size_get > 0:
                 self.get_size = params.eval_size_get
             else:
@@ -126,14 +152,15 @@ class MultiPDE(Dataset):
                 or (isinstance(self.types, str) and f == self.types)
             ]
             for file in files:
-                task_name = file
-                file_name = file + "_" + str(self.IC_per_param) + self.datasets + ".prefix"
-                file_path = os.path.join(self.directory, file, file_name)
-                task_indices_begin = len(self.data)
-                self.data.extend(self.load_onetask_data(file_path, task_name))
-                task_indices_end = len(self.data)
-                self.task_name.append(task_name)
-                self.task_indices[task_name] = np.arange(task_indices_begin, task_indices_end)
+                for datasets in self.datasets:
+                    task_name = file + datasets
+                    file_name = file + "_" + str(self.IC_per_param) + datasets + ".prefix"
+                    file_path = os.path.join(self.directory, file, file_name)
+                    task_indices_begin = len(self.data)
+                    self.data.extend(self.load_onetask_data(file_path, task_name))
+                    task_indices_end = len(self.data)
+                    self.task_name.append(task_name)
+                    self.task_indices[task_name] = np.arange(task_indices_begin, task_indices_end)
         else:
             for pair in self.type_data_pairs:
                 type,data_name = pair.split(".")
