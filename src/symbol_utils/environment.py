@@ -87,7 +87,7 @@ class SymbolicEnvironment:
             idx_to_words = [self.float_id2word[int(i)] for i in lst]
         else:
             idx_to_words = [self.equation_id2word[int(term)] for term in lst]
-        return self.word_to_infix(idx_to_words, is_float, str_array)
+        return self.word_to_infix(idx_to_words, is_float, str_array), idx_to_words
 
     def gen_expr(self,rng):
         errors = defaultdict(int)

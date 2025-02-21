@@ -224,11 +224,11 @@ class Generator:
                     term_lst_tup = tuple(term_list)
                     term1 = term_lst_tup[i]
                     term2 = term_lst_tup[i + 1]
-                    child_lst = []
-                    for child in term2.children:
-                        child_lst.append(str(child))
-                    child_lst.append(str(-1))
-                    new_term2 = self.mul_terms(child_lst)
+                    # child_lst = []
+                    # for child in term2.children:
+                    #     child_lst.append(str(child))
+                    # child_lst.append(str(-1))
+                    new_term2 = Node("mul",self.params,[Node(str(-1),self.params), term2])
                     term_list[i] = new_term2
                     term_list[i + 1] = term1
                     op_list[i] = "add"

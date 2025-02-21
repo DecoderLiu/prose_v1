@@ -16,6 +16,8 @@ swapping: false
 
 refine: false
 refine_steps: 10
+process_noise: 0.00001
+obs_noise: 0.05
 
 all_type: false
 # Number of tokens for the mantissa (must be a divisor of float_precision+1)

@@ -95,7 +95,7 @@ eval_only: 0
 eval_from_exp: ""
 # Print/graph all outputs
 print_outputs: 0
-
+print_invalid: 0
 # Log evaluation plots for each epoch, each type (-1 to disable)
 log_eval_plots: -1
 

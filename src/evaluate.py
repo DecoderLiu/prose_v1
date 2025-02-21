@@ -227,19 +227,36 @@ class Evaluator(object):
                     symbol_output = (
                         symbol_output.transpose(1, 2).cpu().tolist()
                     )  # (bs, 1, text_len)
-                    symbol_output = [
-                        list(
-                            filter(
-                                lambda x: x is not None,
-                                [
-                                    self.symbol_env.idx_to_infix(hyp[1:-1], is_float=False, str_array=False)
-                                    for hyp in symbol_output[i]
-                                ],
-                            )
-                        )
-                        for i in range(bs)
-                    ]  # nested list of shape (bs, 1), some inner lists are possibly empty
+                    # symbol_output = [
+                    #     list(
+                    #         filter(
+                    #             lambda x: x is not None,
+                    #             [
+                    #                 self.symbol_env.idx_to_infix(hyp[1:-1], is_float=False, str_array=False)[0]
+                    #                 for hyp in symbol_output[i]
+                    #             ],
+                    #         )
+                    #     )
+                    #     for i in range(bs)
+                    # ]  # nested list of shape (bs, 1), some inner lists are possibly empty
+                    symbol_output1 = []
+                    for i in range(bs):
 
+                        filtered_hyps = []
+                        for hyp in symbol_output[i]:
+                            infix_result, idx_to_word = self.symbol_env.idx_to_infix(hyp[1:-1], is_float=False,
+                                                                        str_array=False)
+                            if infix_result is None and params.print_invalid and params.print_outputs:
+                                logger.info("Invalid!")
+
+                                logger.info("Input:     {}".format(dict["input_structure"][i]))
+                                logger.info("Generated: {}".format(idx_to_word))
+
+                                logger.info("Target:    {}\n".format(dict["tree_structure"][i]))
+                            filtered_hyps.append(infix_result)
+                        filtered_hyps = list(filter( lambda x: x is not None,filtered_hyps))
+                        symbol_output1.append(filtered_hyps)
+                    symbol_output = symbol_output1
                     for i in range(bs):
                         tree_list = symbol_output[i]
                         label_outputs = None
@@ -260,7 +277,10 @@ class Evaluator(object):
                                     generated_outputs = eval_expr(self.X, self.T)
                                     if self.params.symbol.refine:
                                         init_variable, fluxx, viscous = self.init_param(expr_copy)
-                                        refined_expr_org, generated_data_ref = self.refinement(expr_copy,raw_data[i],init_variable, fluxx, viscous )
+                                        try:
+                                            refined_expr_org, generated_data_ref = self.refinement(expr_copy,raw_data[i],init_variable, fluxx, viscous )
+                                        except:
+                                            raise "Refinement: Unable to converge."
 
                                         equation = sy.sympify(refined_expr_org)
                                         refined_expr = equation.subs(self.sympy_sybol["u"], self.sympy_sybol["tens_poly"])
@@ -297,6 +317,13 @@ class Evaluator(object):
                                                         np.sum(label_outputs ** 2) + eps))
                                         valid_refined_loss.append(error_refined)
                             except:
+                                if  params.print_invalid and params.print_outputs:
+                                    logger.info("Error Large")
+
+                                    logger.info("Input:     {}".format(dict["input_structure"][i]))
+                                    logger.info("Generated: {}".format(tree_list[0]))
+
+                                    logger.info("Target:    {}\n".format(dict["tree_structure"][i]))
                                 continue
                         if len(valid_loss) > 0:
                             # generated tree is valid, compute other metrics
@@ -624,10 +651,10 @@ class Evaluator(object):
         M = 500
         T = p.symbol.refine_steps
 
-        obs_noise =  np.linalg.norm(data_input[0].cpu().numpy())/20
+        obs_noise =  np.linalg.norm(data_input[0].cpu().numpy()) * p.symbol.obs_noise
 
         # STD of Process noise
-        process_noise = 0.00001
+        process_noise = p.symbol.process_noise
 
         # Define the initial distribution of particles for alpha (uniform distribution)
         def initial_distribution(init_alpha):
