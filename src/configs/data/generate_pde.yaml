@@ -20,6 +20,9 @@ IC_range: 1
 param_range_gamma: 0.1
 param_range_shift: 1
 
+my_heat: 
+  dim: 1
+
 burgers:
   dim: 1
 heat:

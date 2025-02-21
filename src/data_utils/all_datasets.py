@@ -198,6 +198,7 @@ class MultiPDE(Dataset):
 
         if self.params.separate_modality:
             filename = path[:-7] + "_data.h5"
+            logger.info(f"Local_indices {len(local_indices)}, {np.min(local_indices)}, {np.max(local_indices)}")
             assert os.path.isfile(filename), "Data file {} not found".format(path)
             with h5py.File(filename, "r") as hf:
                 data_matrix = hf["data"][local_indices, : self.params.data.t_num]

@@ -63,6 +63,10 @@ class PDEGenerator(Generator):
                 # "compressiveNS",
                 # "twobody_diff_logisreact_1D",
             ]
+        elif self.params.data.types == 'test':
+            self.types = [
+                'my_heat',
+            ]
 
         else:
             try:
@@ -82,6 +86,7 @@ class PDEGenerator(Generator):
         self.x_range = self.params.data.x_range[1]
         self.x_num = self.params.data.x_num
         self.tfinals = {
+            "my_heat" : 3,
             "heat" : self.t_range,
             "porous_medium": 0.1,
             "advection": self.t_range,
@@ -314,6 +319,148 @@ class PDEGenerator(Generator):
                 ]
             ]
             return op_list, term_list
+    def my_init(self, x_grid,num_initial_points):
+        numbers = num_initial_points * 10
+        x = x_grid.flatten()
+        A = np.random.rand(numbers) + np.ones(numbers) 
+        phi = (np.random.rand(numbers) + np.ones(numbers) )*np.pi
+        phase = (np.random.rand(numbers) - 0.5* np.ones(numbers) )*np.pi
+        result = np.zeros((numbers, x.shape[0]))
+        for i in range(numbers):
+            result[i] = np.array(A[i]*np.sin(phi[i]*x) + phase[i])
+        return result
+    def my_heat_tree_list(self):
+        if self.params.symbol.use_sympy:
+            ph = sy.symbols(self.ph)
+            x, t = sy.symbols('x t')
+            u = sy.Function('u_0')(x, t)
+
+            heat_expr = ph * sy.diff(u, t) - ph * sy.diff(u, (
+            x, 2))  # This also allows us to use this in generation with sy.lamdify
+            return str(heat_expr)
+        else:
+            p = self.params
+            ph = self.ph
+            op_list = [["sub"]]
+            term_list = [
+                [
+                    self.mul_terms([ph, "ut_0"]),
+                    self.mul_terms([ph, "uxx_0"]),
+                ]
+            ]
+            return op_list, term_list
+
+    def generate_my_heat(self, rng, ICs=None,coeff = None):
+        item = {"type": "heat"}
+        p = self.params
+        if coeff is not None:
+            c1 = coeff[0]
+        else:
+            c1 = 1
+            c1_range = self.get_sample_range(c1)
+            c1 = self.refine_floats(rng.uniform(*c1_range, (1,)))[0]
+
+        tf = self.tfinals["my_heat"]
+        coeff_t = self.t_range/tf
+
+        if self.params.symbol.use_sympy or self.params.symbol.all_type:
+            x, t = sy.symbols('x t')
+            u = sy.Function('u_0')(x, t)
+
+            heat_expr = coeff_t * sy.diff(u, t) - c1 * sy.diff(u, (
+            x, 2))  # This also allows us to use this in generation with sy.lamdify
+            name = "tree_sympy"  if self.params.symbol.all_type else "tree"
+            item[name] = str(heat_expr)
+        if not self.params.symbol.use_sympy or self.params.symbol.all_type:
+            op_list = [["sub"]]
+            term_list = [
+                [
+                    self.mul_terms([str(coeff_t), "ut_0"]),
+                    self.mul_terms([str(c1), "uxx_0"]),
+                ]
+            ]
+            if self.params.symbol.swapping:
+                op_list, term_list =  self.full_tree_with_swapping_term(op_list,term_list,rng)
+
+            item["tree"] = self.tree_from_list(op_list, term_list)
+
+
+        #
+        def f_closure(c1):
+
+            def f(t, u):
+                d2u_dx2 = np.zeros_like(u)
+                dx = self.x_range / self.x_num
+                # Compute second spatial derivatives using central differences
+                for i in range(1, self.x_num - 1):
+                    d2u_dx2[i] = (u[i - 1] - 2 * u[i] + u[i + 1]) / dx**2
+
+                # Periodic boundary conditions
+                d2u_dx2[0] = (u[-1] - 2 * u[0] + u[1]) / dx**2
+                d2u_dx2[-1] = (u[-2] - 2 * u[-1] + u[0]) / dx**2
+
+                du_dt = c1 * d2u_dx2
+                return du_dt
+
+            return f
+
+        item["func"] = f_closure(c1)
+
+        num_initial_points = self.ICs_per_equation
+        if ICs is not None:
+            y_0s = np.array(ICs)
+        elif self.IC_types == "train":
+            y_0s = np.array(
+                self.my_init(
+                    self.x_grid.flatten(),
+                    num_initial_points * 10,
+                )
+            )
+        else:
+            y_0s = np.array(
+                generate_gaussian_process_jax(
+                    self.x_grid.flatten(),
+                    init_key=rng.randint(100000),
+                    num=num_initial_points * 10,
+                    kernel=rbf_kernel_jax,
+                    k_sigma=1,
+                    k_l=0.2,
+                )
+            )
+            # slope = (y_0s[:,-1] - y_0s[:,0])/self.x_range
+            #
+            # y_0s -= np.outer(slope,self.x_grid.flatten() )
+            #
+            # y_0s = (y_0s - np.min(y_0s,axis = 1).reshape(-1,1))/ (np.max(y_0s,axis = 1).reshape(-1,1)-np.min(y_0s,axis = 1).reshape(-1,1))
+        res = []
+        fun = item["func"]
+        for i in range(num_initial_points * 10):
+            y_0 = y_0s[i, :]
+            try:
+                sol = solve_ivp(
+                    fun,
+                    [t /coeff_t for t in self.t_span],
+                    y_0,
+                    method="BDF",
+                    t_eval=self.t_eval/coeff_t,
+                    rtol=self.rtol,
+                    atol=self.atol,
+                )
+
+                if (sol.status) == 0 and (np.max(np.abs(sol.y)) < 1e3):
+                    res.append(torch.from_numpy(sol.y.transpose().astype(np.single)).unsqueeze(-1))
+                    if len(res) >= num_initial_points:
+                        break
+            except Exception as e:
+                pass
+        item["data"] = res
+        item["t_grid"] = self.t_eval
+        item["t_span"] = self.t_span
+        item["x_grid"] = self.x_grid
+
+
+        return item
+
 
     def generate_heat(self, rng, ICs=None,coeff = None):
         item = {"type": "heat"}

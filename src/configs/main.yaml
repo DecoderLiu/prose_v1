@@ -23,7 +23,7 @@ output_start: -1
 output_end: -1
 output_step: 2
 # num of training data in total
-train_size: 51200
+train_size: 2560
 # num of training data in actual training, < train_size, get from num of train_size data
 train_size_get: -1
 # Add additional noise to data (0 to disable)
@@ -82,7 +82,7 @@ data_symbol_loss_ratio: 5
 ### evaluate
 
 # Size of test samples (-1 for everything)
-eval_size: 40000
+eval_size: 2560
 eval_size_get: -1
 eval_support_size: 10
 # Batch size for evaluation (if null, set to 1.5*batch_size)
@@ -117,7 +117,7 @@ reload_checkpoint: null
 plot_worst: False
 
 ### experiment & logging names
-exp_name: debug
+exp_name: test
 exp_id: run1
 
 use_wandb: 1
